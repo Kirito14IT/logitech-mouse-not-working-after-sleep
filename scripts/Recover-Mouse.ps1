@@ -1,140 +1,72 @@
-# Recover-Mouse.ps1
-# 罗技 G304 无线鼠标"软拔插"恢复。
-# 原理：罗技 LIGHTSPEED 接收器上挂了 logi_lamparray 这个 USB 下层过滤驱动，
-#       它卡死时会把鼠标的 HID 报告全部吞掉（设备管理器却显示一切正常）。
-#       重新枚举设备树 = 软件层面模拟一次拔插 USB。
+# Recover-Mouse.ps1 — 重新枚举罗技 LIGHTSPEED 接收器（软件层面的 USB 复位）。
 #
-# 参数：
-#   -Elevate  若当前不是管理员，则自动以管理员身份重新启动自己
-#   -Silent   不显示 UAC 提示窗口
-#   -Measure  修复后自动检测 G304 是否恢复上报
+# 为什么能修：接收器在待机时所在的 USB 端口被下电，接收器固件随之掉电；
+# 唤醒后它不会自动重新监听已配对的鼠标，于是鼠标完全不上报，而设备管理器里
+# 一切显示正常。给接收器做一次 USB 复位（禁用→启用）等于物理上拔插一次，
+# 固件重启后就会重新监听，鼠标立即恢复。
+#
+# 两种模式：
+#   -Fast（默认）只复位接收器本体，约 4~6 秒。这是用户能感觉到的中断时长。
+#   -Full 额外重建鼠标 HID 集合并重启 pnputil，用于接收器复位后仍未恢复的场合。
+#
+# 需要管理员权限。
 
 [CmdletBinding()]
 param(
-    [switch] $Elevate,
-    [switch] $Silent,
-    [switch] $Measure
+    [switch] $Full,
+    [switch] $Silent
 )
 
 $ErrorActionPreference = 'Continue'
-$Base = 'E:\LogitechMouseFix'
+if (-not $Silent) { Write-Host "`n=== 罗技接收器复位 ===" -ForegroundColor Cyan }
 
-if (-not $Silent) { Write-Host "`n=== 罗技 G304 恢复工具 ===" -ForegroundColor Cyan }
-
-# ---------- 提权 ----------
-if ($Elevate) {
-    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $pr = New-Object Security.Principal.WindowsPrincipal($id)
-    if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        $psExe = (Get-Process -Id $PID).Path
-        $args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$PSCommandPath")
-        $p = Start-Process -FilePath $psExe -ArgumentList $args -Verb RunAs -PassThru
-        if (-not $Silent) { Write-Host "已请求管理员权限，请在 UAC 弹窗点『是』…" -ForegroundColor Yellow }
-        $p.WaitForExit()
-        exit $p.ExitCode
-    }
-}
-
-# ---------- 定位设备 ----------
-function Get-ReceiverNode {
-    Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.InstanceId -like 'USB\VID_046D&PID_C53F\*' -and
-            $_.InstanceId -notmatch '&MI_' -and
-            $_.InstanceId -notmatch 'LAMPARRAY'
-        } | Select-Object -First 1
-}
-
-function Get-MouseHidNode {
-    Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
-        Where-Object { $_.InstanceId -like 'HID\VID_046D&PID_C53F&MI_01&COL01*' } |
+$recv = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
+        Where-Object { $_.InstanceId -like 'USB\VID_046D&PID_C53F\*' -and $_.InstanceId -notmatch '&MI_|LAMPARRAY' } |
         Select-Object -First 1
-}
-
-function Get-ReceiverHidNodes {
-    Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
-        Where-Object { $_.InstanceId -like 'HID\VID_046D&PID_C53F*' }
-}
-
-$recv = Get-ReceiverNode
-$recvHid = Get-ReceiverHidNodes
-$mouse = Get-MouseHidNode
 
 if (-not $recv) {
-    if (-not $Silent) { Write-Host "[!] 没有找到 LIGHTSPEED 接收器（VID_046D&PID_C53F）。" -ForegroundColor Red }
+    if (-not $Silent) { Write-Host "[!] 找不到 LIGHTSPEED 接收器。" -ForegroundColor Red }
     exit 2
 }
-if (-not $Silent) {
-    Write-Host "接收器 : $($recv.InstanceId)"
-    Write-Host "鼠标HID: $($mouse.InstanceId)"
-}
+if (-not $Silent) { Write-Host "接收器: $($recv.InstanceId)" }
 
-# ---------- 步骤 1：重启罗技 LampArray 用户态服务 ----------
-if (-not $Silent) { Write-Host "`n[1/4] 重启 Logitech LampArray 服务…" -ForegroundColor Cyan }
-try {
-    Stop-Service -Name 'logi_lamparray_service' -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
-    Start-Service -Name 'logi_lamparray_service' -ErrorAction SilentlyContinue
-} catch { }
-Start-Sleep -Milliseconds 800
+$sw = [Diagnostics.Stopwatch]::StartNew()
 
-# ---------- 步骤 2：禁用/启用接收器（软拔插） ----------
-if (-not $Silent) { Write-Host "[2/4] 重新枚举接收器设备树（软件模拟拔插 USB）…" -ForegroundColor Cyan }
+# ── 复位接收器本体 ──
 try {
     Disable-PnpDevice -InstanceId $recv.InstanceId -Confirm:$false -ErrorAction Stop
 } catch {
-    if (-not $Silent) { Write-Host "     禁用失败，改用 pnputil: $($_.Exception.Message)" -ForegroundColor DarkYellow }
+    if (-not $Silent) { Write-Host "  禁用失败: $($_.Exception.Message)" -ForegroundColor DarkYellow }
 }
-Start-Sleep -Seconds 2
+Start-Sleep -Milliseconds 700
 try {
     Enable-PnpDevice -InstanceId $recv.InstanceId -Confirm:$false -ErrorAction Stop
 } catch {
-    if (-not $Silent) { Write-Host "     启用失败: $($_.Exception.Message)" -ForegroundColor DarkYellow }
-}
-Start-Sleep -Seconds 3
-
-# ---------- 步骤 3：pnputil 重启设备（第二道保险） ----------
-if (-not $Silent) { Write-Host "[3/4] pnputil /restart-device 接收器…" -ForegroundColor Cyan }
-pnputil /restart-device "$($recv.InstanceId)" 2>&1 | Out-Null
-Start-Sleep -Seconds 3
-
-# ---------- 步骤 4：重建鼠标 HID 集合 ----------
-if (-not $Silent) { Write-Host "[4/4] 重建鼠标 HID 集合…" -ForegroundColor Cyan }
-$mouse = Get-MouseHidNode
-if ($mouse) {
-    try {
-        Disable-PnpDevice -InstanceId $mouse.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-        Enable-PnpDevice  -InstanceId $mouse.InstanceId -Confirm:$false -ErrorAction SilentlyContinue
-    } catch { }
+    if (-not $Silent) { Write-Host "  启用失败: $($_.Exception.Message)" -ForegroundColor DarkYellow }
 }
 Start-Sleep -Seconds 2
 
-# ---------- 结果 ----------
-$recv2 = Get-ReceiverNode
-$mouse2 = Get-MouseHidNode
-if (-not $Silent) {
-    Write-Host "`n--- 设备状态 ---" -ForegroundColor Cyan
-    if ($recv2)  { Write-Host "接收器 : $($recv2.Status)  $($recv2.InstanceId)" }
-    if ($mouse2) { Write-Host "鼠标HID: $($mouse2.Status)  $($mouse2.InstanceId)" }
-    $lf = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Enum\$($recv2.InstanceId)" -Name LowerFilters -ErrorAction SilentlyContinue).LowerFilters
-    Write-Host "下层过滤器: $($lf -join ', ')"
-}
-
-$ok = $true
-if ($Measure) {
-    . "$Base\RawInput.ps1"
-    $r = Measure-G304 -Milliseconds 8000
-    $ok = $r.Ok
-    if (-not $Silent) {
-        if ($ok) { Write-Host "`n[GOK] G304 已恢复上报数据。" -ForegroundColor Green }
-        else     { Write-Host "`n[WARN] 仍未检测到 G304 的移动事件 —— 可能需要执行 Fix-LogitechMouse.ps1 移除 logi_lamparray 过滤器。" -ForegroundColor Red }
+if ($Full) {
+    # ── 重建鼠标 HID 集合 ──
+    $mouse = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
+             Where-Object { $_.InstanceId -like 'HID\VID_046D&PID_C53F&MI_01&COL01*' } |
+             Select-Object -First 1
+    if ($mouse) {
+        try { Disable-PnpDevice -InstanceId $mouse.InstanceId -Confirm:$false -ErrorAction SilentlyContinue } catch {}
+        Start-Sleep -Milliseconds 700
+        try { Enable-PnpDevice -InstanceId $mouse.InstanceId -Confirm:$false -ErrorAction SilentlyContinue } catch {}
     }
+    # ── 再补一次 pnputil 级别的重启 ──
+    $recv2 = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
+             Where-Object { $_.InstanceId -like 'USB\VID_046D&PID_C53F\*' -and $_.InstanceId -notmatch '&MI_|LAMPARRAY' } |
+             Select-Object -First 1
+    if ($recv2) { pnputil /restart-device "$($recv2.InstanceId)" 2>&1 | Out-Null }
+    Start-Sleep -Seconds 2
 }
 
+$sw.Stop()
 if (-not $Silent) {
-    Write-Host ""
-    Write-Host "如果鼠标仍然没反应：请运行  E:\LogitechMouseFix\Fix-LogitechMouse.ps1（需管理员）" -ForegroundColor Yellow
-    Read-Host "按回车关闭"
+    Write-Host ("  完成，用时 {0:N1} 秒" -f $sw.Elapsed.TotalSeconds) -ForegroundColor Green
+    Write-Host "  如果鼠标仍然没反应，请重试一次（接收器可能需要两次复位）。`n"
 }
-exit $(if ($ok) { 0 } else { 1 })
+exit 0

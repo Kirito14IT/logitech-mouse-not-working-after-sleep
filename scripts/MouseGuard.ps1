@@ -24,6 +24,10 @@ $stateDir = "$Base\state"
 New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
 $logFile  = "$stateDir\guard.log"
 
+# 手工复位请求：桌面入口写这个文件，守护（SYSTEM 权限）看到后执行复位
+$requestFile = "$stateDir\repair.request"
+$requestDone = "$stateDir\repair.done"
+
 function W([string]$m) {
     $line = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m
     Add-Content -Path $logFile -Value $line -Encoding UTF8
@@ -97,10 +101,11 @@ $lastInstance = $null
 $recvId       = $null
 $prevIdle     = 0L
 $lastRepair   = 0L
-# 超过这个空闲时长，认为"可能已经掉电"
+# 超过这个空闲时长，认为"可能已经进入掉电状态"
 $RETURN_IDLE_MS = 240000          # 4 分钟
 $COOLDOWN_MS    = 60000           # 两次复位之间的最小间隔
-$IDLE_REPAIR_MS = 1200000         # T5 兜底：20 分钟
+$IDLE_REPAIR_MS = 120000          # T5 兜底：2 分钟一次
+$IDLE_TRIGGER_MS = 300000         # 空闲超过 5 分钟才进入 T5
 $POLL_MS        = 3000
 $RESCAN_EVERY   = 5               # 每 5 次（约 15 秒）全量枚举一次
 
@@ -109,6 +114,16 @@ try {
     while ($true) {
         $tick++
         $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+        # ── T6：手工请求（桌面的「一键恢复鼠标」写这个文件）──
+        #     守护本身以 SYSTEM 权限运行，所以由它来复位就不需要弹 UAC。
+        #     放在循环最前面，响应最快。
+        if (Test-Path -LiteralPath $requestFile) {
+            try { Remove-Item -LiteralPath $requestFile -Force -ErrorAction SilentlyContinue } catch { }
+            Repair "T6 收到手工复位请求"
+            $lastRepair = $now
+            Set-Content -LiteralPath $requestDone -Value (Get-Date -Format 'o') -Encoding UTF8
+        }
 
         # ── 便宜路径：查已缓存实例的 LastArrivalDate ──
         if ($recvId) {
@@ -152,9 +167,13 @@ try {
             }
         }
 
-        # ── T5：长时间空闲时的低频兜底，保证最坏 20 分钟内恢复 ──
-        if ($idle -gt 600000 -and ($now - $lastRepair) -gt $IDLE_REPAIR_MS) {
-            Repair "T5 长时间空闲兜底复位"
+        # ── T5：用户离开期间周期性复位接收器（主动式）──
+        #     关键：Modern Standby 下用户态程序仍在运行，USB 复位会重新给端口
+        #     供电并重启接收器固件。如果待机期间的复位也生效，那么用户回来时
+        #     接收器就是新鲜的 —— 直接滑鼠标即可，不必碰键盘。
+        #     即便待机期间复位无效，T2 依然会在用户碰到键盘/触控板时兜底。
+        if ($idle -gt $IDLE_TRIGGER_MS -and ($now - $lastRepair) -gt $IDLE_REPAIR_MS) {
+            Repair "T5 空闲期间主动复位接收器（让用户回来时鼠标已经是好的）"
             $lastRepair = $now
         }
 

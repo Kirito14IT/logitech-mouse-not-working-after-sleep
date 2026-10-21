@@ -1,0 +1,59 @@
+
+[2026-10-21 21:25:24] [INFO] ===== 最终收尾（修正版）开始 =====
+[2026-10-21 21:25:24] [STEP] --- 1. 禁止 Windows 关闭罗技接收器接口的电源 ---
+[2026-10-21 21:25:24] [INFO]   Enable=False -> USB\VID_046D&PID_C53F&MI_01\7&335346df&3&0001_0
+[2026-10-21 21:25:24] [INFO]   Enable=False -> USB\VID_046D&PID_C53F&MI_02\7&335346df&3&0002_0
+[2026-10-21 21:25:24] [INFO]   复查通过：所有罗技接口均已禁止被关闭
+[2026-10-21 21:25:24] [STEP] --- 2. 备份并卸载 logi_lamparray 驱动包 ---
+[2026-10-21 21:25:24] [INFO]   没有需要卸载的 logi_lamparray 驱动包
+[2026-10-21 21:25:32] [INFO]   logi_lamparray 驱动包已全部清除
+[2026-10-21 21:25:34] [INFO]   接收器: OK  LowerFilters=[vhf]  驱动=Logitech 1.1.84.7627 (oem103.inf)
+[2026-10-21 21:25:34] [INFO]   鼠标HID: OK  HID\VID_046D&PID_C53F&MI_01&COL01\8&1293EAEC&0&0000
+[2026-10-21 21:25:35] [STEP] --- 3. 注册恢复后自愈任务 ---
+[2026-10-21 21:25:35] [INFO]   OK -> 从低功耗状态恢复 [System]
+[2026-10-21 21:25:35] [STEP] --- 4. 任务复查 ---
+[2026-10-21 21:25:35] [INFO]   LogitechG304AutoRecover = Ready
+[2026-10-21 21:25:36] [INFO]   LogitechG304RecoverOnResume = Ready
+[2026-10-21 21:25:36] [INFO]   LogitechG304Watchdog = Ready
+[2026-10-21 21:25:36] [STEP] --- 5. 最终状态 ---
+[2026-10-21 21:25:38] [INFO] ================ 罗技 G304 鼠标修复报告 ================
+时间              : 2026-10-21 21:25:38
+
+【根因】
+  接收器 USB 节点上挂着罗技的 logi_lamparray 内核下层过滤驱动。
+  它在 Modern Standby 之后卡死，会吞掉接收器全部 HID 报告，
+  而设备管理器显示一切正常（Status=OK / CM_PROB_NONE）——
+  这正是"拔插 USB 或重启能好、但看不出哪里坏了"的原因。
+  加重因素：USB 选择性暂停=启用、DeviceSelectiveSuspended=1、快速启动=启用。
+  G304 是单色 DPI 指示灯机型，这套 RGB 组件对它毫无用处，属误装。
+
+【已执行的修复】
+  1. 从接收器设备节点移除 logi_lamparray 下层过滤器（2 个 Enum 实例）
+  2. 停用 logi_lamparray 内核驱动 (Start=4) 与 logi_lamparray_service
+  3. 备份并卸载 logi_lamparray 驱动包（防止换 USB 口时被 INF 重新写回）
+  4. 关闭 USB 选择性暂停（全部电源方案，AC + DC）
+  5. 关闭设备电源管理（禁止 Windows 关闭接收器接口）
+  6. 关闭快速启动
+  7. 关闭空闲自动睡眠
+  8. Device Parameters: SelectiveSuspendEnabled=0, EnhancedPowerManagementEnabled=0
+
+【当前状态】
+  接收器              : OK   USB\VID_046D&PID_C53F\6&18811D57&0&1
+  鼠标 HID 节点       : OK   HID\VID_046D&PID_C53F&MI_01&COL01\8&1293EAEC&0&0000
+  接收器当前驱动      : Logitech 1.1.84.7627 (oem103.inf)
+  下层过滤器           : vhf
+  USB 选择性暂停       : 已禁用
+  设备电源管理         : 已禁止关闭
+  快速启动             : 已关闭
+  非 OK 的罗技设备     : 0 个
+
+【自愈工具】
+  一键恢复（桌面）     : C:\Users\<user>\Desktop\一键恢复鼠标.lnk
+  一键恢复（脚本）     : E:\LogitechMouseFix\一键恢复鼠标.bat
+  恢复脚本             : E:\LogitechMouseFix\Recover-Mouse.ps1
+  看门狗脚本           : E:\LogitechMouseFix\Watchdog.ps1
+  计划任务             : LogitechG304AutoRecover / LogitechG304RecoverOnResume / LogitechG304Watchdog
+  备份                 : E:\LogitechMouseFix\backup\  (可完整回滚)
+====================================================
+[2026-10-21 21:25:38] [INFO] ===FINISH2-END===
+

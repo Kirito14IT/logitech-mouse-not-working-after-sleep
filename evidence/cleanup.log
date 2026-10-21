@@ -1,0 +1,59 @@
+
+[2026-10-21 21:26:47] [INFO] ===== 驱动包清理开始 =====
+[2026-10-21 21:26:47] [INFO] 枚举到 4 个 logi_lamparray 驱动包: oem6.inf[logi_lamparray_hid.inf], oem78.inf[logi_lamparray_usb.inf], oem103.inf[logi_lamparray_usb.inf], oem18.inf[logi_lamparray_usb.inf]
+[2026-10-21 21:26:47] [INFO]   已备份驱动目录: logi_lamparray_hid.inf_amd64_1cf90b351350b768
+[2026-10-21 21:26:48] [INFO]   已备份驱动目录: logi_lamparray_usb.inf_amd64_aec3f212d50aa03b
+[2026-10-21 21:26:48] [INFO]   已备份驱动目录: logi_lamparray_usb.inf_amd64_dc165490f32791ad
+[2026-10-21 21:26:48] [INFO]   已备份驱动目录: logi_lamparray_usb.inf_amd64_e7cd8faef8863187
+[2026-10-21 21:26:48] [INFO]   删除 oem6.inf (logi_lamparray_hid.inf) -> Microsoft PnP 工具 | 与 /uninstall 一起使用以删除驱动程序包时忽略 /force。 | 已卸载驱动程序包。 | 已成功删除驱动程序程序包。
+[2026-10-21 21:26:48] [INFO]   删除 oem78.inf (logi_lamparray_usb.inf) -> Microsoft PnP 工具 | 与 /uninstall 一起使用以删除驱动程序包时忽略 /force。 | 已卸载驱动程序包。 | 已成功删除驱动程序程序包。
+[2026-10-21 21:26:54] [INFO]   删除 oem103.inf (logi_lamparray_usb.inf) -> Microsoft PnP 工具 | 与 /uninstall 一起使用以删除驱动程序包时忽略 /force。 | 需要重新启动系统才能完成卸载操作! | 已成功删除驱动程序程序包。 | 需要重新启动系统才能完成取消配置操作!
+[2026-10-21 21:26:55] [INFO]   删除 oem18.inf (logi_lamparray_usb.inf) -> Microsoft PnP 工具 | 与 /uninstall 一起使用以删除驱动程序包时忽略 /force。 | 已卸载驱动程序包。 | 已成功删除驱动程序程序包。
+[2026-10-21 21:27:03] [INFO]   logi_lamparray 驱动包已全部卸载
+[2026-10-21 21:27:05] [INFO]   接收器: OK  LowerFilters=[]
+[2026-10-21 21:27:05] [INFO]   接收器驱动: libwdi 6.1.7600.16385 (oem13.inf)
+[2026-10-21 21:27:05] [INFO]   鼠标HID:   
+[2026-10-21 21:27:06] [INFO]   VID_046D 设备 1 个，非 OK: 0 个
+[2026-10-21 21:27:06] [INFO] ================ 罗技 G304 鼠标修复报告 ================
+时间              : 2026-10-21 21:27:06
+
+【根因】
+  接收器 USB 节点上挂着罗技的 logi_lamparray 内核下层过滤驱动。
+  它在 Modern Standby 之后卡死，会吞掉接收器全部 HID 报告，
+  而设备管理器显示一切正常（Status=OK / CM_PROB_NONE）——
+  这正是"拔插 USB 或重启能好、但看不出哪里坏了"的原因。
+  加重因素：USB 选择性暂停=启用、DeviceSelectiveSuspended=1、快速启动=启用。
+  G304 是单色 DPI 指示灯机型，这套 RGB 组件对它毫无用处，属误装。
+
+【已执行的修复】
+  1. 从接收器设备节点移除 logi_lamparray 下层过滤器（2 个 Enum 实例）
+  2. 停用 logi_lamparray 内核驱动 (Start=4) 与 logi_lamparray_service
+  3. 备份并卸载 logi_lamparray 驱动包（已全部卸载）
+     —— 必须清掉，否则换 USB 口时 INF 会把过滤器写回来，
+        而内核驱动已被停用，设备会直接"无法启动"(Code 10/39)
+  4. 关闭 USB 选择性暂停（全部电源方案，AC + DC）
+  5. 关闭设备电源管理（禁止 Windows 关闭接收器接口）
+  6. 关闭快速启动
+  7. 关闭空闲自动睡眠
+  8. Device Parameters: SelectiveSuspendEnabled=0, EnhancedPowerManagementEnabled=0
+
+【当前状态】
+  接收器              : OK   USB\VID_046D&PID_C53F\6&18811D57&0&1
+  鼠标 HID 节点       :    
+  接收器当前驱动      : libwdi 6.1.7600.16385 (oem13.inf)
+  下层过滤器           : 
+  USB 选择性暂停       : 已禁用
+  设备电源管理         : 已禁止关闭
+  快速启动             : 已关闭
+  非 OK 的罗技设备     : 0 个
+
+【自愈工具】
+  一键恢复（桌面）     : C:\Users\<user>\Desktop\一键恢复鼠标.lnk
+  一键恢复（脚本）     : E:\LogitechMouseFix\一键恢复鼠标.bat
+  恢复脚本             : E:\LogitechMouseFix\Recover-Mouse.ps1
+  看门狗脚本           : E:\LogitechMouseFix\Watchdog.ps1
+  计划任务             : LogitechG304AutoRecover / LogitechG304RecoverOnResume / LogitechG304Watchdog
+  备份（可完整回滚）   : E:\LogitechMouseFix\backup\
+====================================================
+[2026-10-21 21:27:06] [INFO] ===CLEANUP-END===
+

@@ -1,0 +1,50 @@
+================ 罗技 G304 鼠标修复报告 ================
+生成时间          : 2026-10-21 21:31:34
+
+【根因】
+  接收器 USB 节点上挂着罗技的 logi_lamparray 内核下层过滤驱动
+  (LowerFilters = "vhf, logi_lamparray")。
+  它在 Modern Standby 之后卡死，会吞掉接收器全部 HID 报告，
+  而设备管理器显示一切正常（Status=OK / CM_PROB_NONE）——
+  这正是"拔插 USB 或重启能好、但看不出哪里坏了"的原因。
+  加重因素：USB 选择性暂停=启用、DeviceSelectiveSuspended=1、快速启动=启用。
+  你的 G304 是单色 DPI 指示灯机型，这套 RGB(LampArray) 组件对它毫无用处，
+  属于罗技通用驱动包误装。
+
+【已执行的修复】
+  1. 从接收器设备节点移除 logi_lamparray 下层过滤器（原 2 个 Enum 实例）
+  2. 停用 logi_lamparray 内核驱动 与 logi_lamparray_service
+  3. 卸载 logi_lamparray 全部驱动包 —— 防止换 USB 口时被 INF 写回过滤器
+  4. 卸载抢走整个复合设备的 LIGHTSPEED_Receiver.inf (libwdi/WinUSB)
+  5. 接收器回落到微软通用驱动 usbccgp (usb.inf)，LowerFilters 现在为空
+  6. 关闭 USB 选择性暂停（全部电源方案，AC + DC）
+  7. 关闭设备电源管理（禁止 Windows 关闭接收器接口）
+  8. 关闭快速启动（否则"关机再开机"实为休眠恢复，USB 设备常半死）
+  9. 关闭空闲自动睡眠
+  10. Device Parameters: SelectiveSuspendEnabled=0、EnhancedPowerManagementEnabled=0
+
+【当前状态】
+  接收器              : OK   USB\VID_046D&PID_C53F\6&18811D57&0&1
+  接收器驱动          : Microsoft 10.0.26100.9711 (usb.inf)
+  下层过滤器          : [空 —— 没有任何第三方过滤器]
+  鼠标 HID 节点       : OK   HID\VID_046D&PID_C53F&MI_01&COL01\8&2C2C0656&0&0000
+  USB 选择性暂停      : 已禁用
+  设备电源管理        : 已禁止关闭
+  快速启动            : 已关闭
+  空闲自动睡眠        : 已关闭
+  非 OK 的罗技设备    : 0 个
+  一键恢复流程实测    : 通过（重枚举后鼠标 HID 仍为 OK）
+
+【自愈工具】
+  桌面快捷方式        : C:\Users\<user>\Desktop\一键恢复鼠标.lnk
+  一键恢复脚本        : E:\LogitechMouseFix\一键恢复鼠标.bat
+  恢复脚本            : E:\LogitechMouseFix\Recover-Mouse.ps1
+  看门狗脚本          : E:\LogitechMouseFix\Watchdog.ps1
+  计划任务            : LogitechG304AutoRecover / LogitechG304RecoverOnResume / LogitechG304Watchdog
+  备份（可完整回滚）  : E:\LogitechMouseFix\backup\
+
+【以后再遇到】
+  双击桌面的"一键恢复鼠标"即可（会弹 UAC，选"是"），
+  等价于一次软件层面的 USB 重新枚举，不需要真的拔插。
+====================================================
+

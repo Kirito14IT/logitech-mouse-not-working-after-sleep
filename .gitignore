@@ -1,0 +1,12 @@
+# PowerShell 会话产物
+*.ps1.bak
+state/
+watchdog-state.txt
+
+# 备份目录体积大且含本机路径，公开仓库不收录
+backup/
+
+# 系统垃圾
+Thumbs.db
+desktop.ini
+.DS_Store

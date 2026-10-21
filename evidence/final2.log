@@ -1,0 +1,16 @@
+
+[2026-10-21 21:31:09] [INFO] ===== 任务重建 + 恢复流程实测 =====
+[2026-10-21 21:31:10] [STEP] --- 1. 重建 LogitechG304RecoverOnResume ---
+[2026-10-21 21:31:10] [INFO]   已通过 XML 注册
+[2026-10-21 21:31:10] [INFO]   任务状态: Ready  触发器: MSFT_TaskEventTrigger
+[2026-10-21 21:31:10] [STEP] --- 2. 端到端实测一键恢复流程 ---
+[2026-10-21 21:31:11] [INFO]   恢复前 鼠标HID: OK  HID\VID_046D&PID_C53F&MI_01&COL01\8&2C2C0656&0&0000
+[2026-10-21 21:31:31] [INFO]   恢复后 鼠标HID: OK  HID\VID_046D&PID_C53F&MI_01&COL01\8&2C2C0656&0&0000
+[2026-10-21 21:31:31] [INFO]   恢复后 接收器 : OK  LowerFilters=[]
+[2026-10-21 21:31:32] [INFO]   VID_046D 设备 11 个，非 OK: 0 个
+[2026-10-21 21:31:32] [STEP] --- 3. 任务清单 ---
+[2026-10-21 21:31:32] [INFO]   LogitechG304AutoRecover = Ready  主体=<user>  触发=MSFT_TaskLogonTrigger
+[2026-10-21 21:31:32] [INFO]   LogitechG304RecoverOnResume = Ready  主体=SYSTEM  触发=MSFT_TaskEventTrigger
+[2026-10-21 21:31:32] [INFO]   LogitechG304Watchdog = Ready  主体=<user>  触发=MSFT_TaskTimeTrigger
+[2026-10-21 21:31:34] [INFO] ===FINAL2-END===
+

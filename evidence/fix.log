@@ -1,0 +1,57 @@
+
+[2026-10-21 21:19:44] [INFO] ===== 罗技 G304 永久修复开始 =====
+[2026-10-21 21:19:44] [INFO] 用户: <user>  管理员: True
+[2026-10-21 21:19:44] [STEP] --- 阶段 0：备份 ---
+[2026-10-21 21:19:45] [INFO] 备份完成 -> E:\LogitechMouseFix\backup\registry-20261021-211944.txt / E:\LogitechMouseFix\backup\power-20261021-211944.txt
+[2026-10-21 21:19:45] [INFO] 接收器节点: USB\VID_046D&PID_C53F\6&18811D57&0&1  Status=OK
+[2026-10-21 21:19:45] [INFO] 当前 LowerFilters: vhf, logi_lamparray
+[2026-10-21 21:19:45] [STEP] --- 阶段 1：基线检测（修复前）---
+[2026-10-21 21:19:45] [INFO] 基线 G304 移动事件数 = -1  => 修复前 失效
+[2026-10-21 21:19:45] [STEP] --- 阶段 A：温和恢复（重启服务 + 重新枚举设备树）---
+[2026-10-21 21:19:48] [INFO]   接收器已禁用
+[2026-10-21 21:19:51] [INFO]   接收器已启用
+[2026-10-21 21:20:01] [INFO] 阶段 A 结果: G304 移动事件 = -1
+[2026-10-21 21:20:01] [STEP] --- 阶段 B：移除 logi_lamparray 下层过滤器 ---
+[2026-10-21 21:20:01] [INFO]   已从 6&18811d57&0&1 移除 logi_lamparray -> [vhf]
+[2026-10-21 21:20:01] [INFO]   已从 7&31912f88&0&4 移除 logi_lamparray -> [vhf]
+[2026-10-21 21:20:12] [INFO] 阶段 B 结果: G304 移动事件 = -1
+[2026-10-21 21:20:12] [STEP] --- 阶段 C：卸载 logi_lamparray_usb.inf 驱动包（兜底）---
+[2026-10-21 21:20:12] [INFO]   接收器当前驱动槽: {36fc9e60-c465-11cf-8056-444553540000}\0023
+[2026-10-21 21:20:23] [INFO] 阶段 C 结果: G304 移动事件 = -1
+[2026-10-21 21:20:23] [STEP] --- 阶段 D：预防性配置 ---
+[2026-10-21 21:20:23] [INFO]   USB 选择性暂停 -> 已禁用 (AC+DC, 全部电源方案)
+[2026-10-21 21:20:23] [WARN]   设置设备电源管理失败: 找不到与参数名称 'ClassName' 匹配的参数。
+[2026-10-21 21:20:24] [INFO]   DeviceParameters.SelectiveSuspendEnabled = 0
+[2026-10-21 21:20:24] [INFO]   DeviceParameters.EnhancedPowerManagementEnabled = 0
+[2026-10-21 21:20:24] [INFO]   快速启动 -> 已关闭
+[2026-10-21 21:20:24] [INFO]   logi_lamparray 内核驱动 -> 已停用（Start=4），不会再被加载
+[2026-10-21 21:20:24] [INFO]   logi_lamparray_service -> 已停用
+[2026-10-21 21:20:24] [INFO]   空闲自动睡眠 -> 已关闭
+[2026-10-21 21:20:24] [STEP] --- 阶段 E：部署一键恢复与自动修复 ---
+[2026-10-21 21:20:25] [INFO]   已生成 @{Count=-1; Ok=False; Device=VID_046D&PID_C53F}\一键恢复鼠标.bat
+[2026-10-21 21:20:25] [INFO]   桌面快捷方式: C:\Users\<user>\Desktop\一键恢复鼠标.lnk
+[2026-10-21 21:20:25] [WARN]   注册登录计划任务失败: 找不到与参数名称 'Force' 匹配的参数。
+[2026-10-21 21:20:25] [INFO]   恢复后自动修复任务: 错误: 找不到指定的信道。  (11,230):Subscription:<QueryList><Query><Select Path='Microsoft-Windows-Kernel-Power'>*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=507)]]</Select></Query></QueryList>
+[2026-10-21 21:20:25] [STEP] --- 阶段 F：最终验证 ---
+[2026-10-21 21:20:26] [INFO] 接收器: OK  USB\VID_046D&PID_C53F\6&18811D57&0&1
+[2026-10-21 21:20:26] [INFO] 鼠标HID: OK  HID\VID_046D&PID_C53F&MI_01&COL01\8&1293EAEC&0&0000
+[2026-10-21 21:20:26] [INFO] 最终 LowerFilters: [vhf]
+[2026-10-21 21:20:26] [INFO] 最终 G304 移动事件 = -1
+[2026-10-21 21:20:26] [INFO] ==== 罗技 G304 修复报告 ====
+时间            : 2026-10-21 21:20:26
+G304 恢复上报    : 否 ✘  （仍未收到移动事件）
+接收器状态      : OK
+鼠标 HID 状态   : OK
+下层过滤器      : vhf
+USB 选择性暂停  : 已禁用
+设备电源管理    : 已禁止关闭
+快速启动        : 已关闭
+空闲自动睡眠    : 已关闭
+logi_lamparray  : 已移除
+一键恢复脚本    : @{Count=-1; Ok=False; Device=VID_046D&PID_C53F}\一键恢复鼠标.bat
+桌面快捷方式    : C:\Users\<user>\Desktop\一键恢复鼠标.lnk
+注册表备份      : E:\LogitechMouseFix\backup\registry-20261021-211944.txt
+电源备份        : E:\LogitechMouseFix\backup\power-20261021-211944.txt
+================================
+[2026-10-21 21:20:26] [INFO] ===SCRIPT-END===
+

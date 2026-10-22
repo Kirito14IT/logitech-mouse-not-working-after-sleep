@@ -122,6 +122,29 @@ Enable-PnpDevice  -InstanceId $recv.InstanceId -Confirm:$false
 
 ---
 
+## ✅ 现场实测验证（2026-10-22 整日）
+
+修复上线后的**第一个完整工作日**，用户反馈：「**今天一整体都没有出现鼠标动不了的情况**」。
+
+守护进程当天的遥测（原始日志：`evidence/field-test-20261022.log`）：
+
+```
+T2  用户从长空闲回来（真实待机回机）  :   6 次   ← 每一次都自动恢复
+T5  空闲期间主动复位接收器            : 314 次   （间隔稳定 ~2 分钟）
+T6  手工请求                          :   8 次
+守护异常                             :   0 次
+当天结束时接收器状态                   : OK / CM_PROB_NONE
+```
+
+**关键在 T2 那 6 次**：每一次都对应一次真实的「待机 → 回机」，而每一次回机时鼠标**直接就能用**——没有手动拔插、没有 UAC、没有用户干预。
+
+这正好验证了方案的两个关键设计：
+
+1. **T5 主动式确实生效**。如果只有 T2 兜底，用户回来时第一次动鼠标应该是"没反应"（T2 要等到他碰到键盘/触控板才触发）。现在回机即用，说明**待机期间的周期性复位已经把接收器保持在健康状态**。
+2. **T2 判据「空闲从长变短」不依赖指针**。314 次 T5 复位期间接收器被反复禁用/启用，`LastArrivalDate` 等信号会变化，但守护没有误触发、也没有漏触发——零异常、零误报。
+
+---
+
 ## 硬件层：真正的根治
 
 | 方案 | 说明 |
@@ -199,6 +222,53 @@ WatchBoth: G304=0 其它=0
 
 任何"按设备区分输入来源"的检测方案在这台机器上都是瞎的。**别把方案建立在它之上**，除非先验证过。
 
+### `powershell.exe`（5.1）读无 BOM 的 UTF-8 脚本会炸
+
+Windows PowerShell 5.1 读**没有 BOM 的 UTF-8** `.ps1` 时按 ANSI（中文系统是 GBK）解码。后果是双重的：
+
+```
+字符层面：中文注释和字符串全变乱码
+语法层面：GBK 把某些 UTF-8 尾字节当成双字节字符的后半段，
+          于是紧跟其后的 ASCII 引号 " 被"吃掉" —— 直接变成 ParserError
+```
+
+真实报错长这样（脚本里明明只有中文注释和正常字符串）：
+
+```
+SystemCleanup.ps1:84 字符: 1
++         if ($sz -lt 1MB) { L ("  跳过 {0}（仅 {1:N0} 字节? -f $sid, $sz
++                                                                 ~
+表达式或语句中包含意外的标记"）"。
+```
+
+而且它是**静默失败**的：`Start-Process` 拉起子进程，子进程解析失败立刻退出，父进程只看到"进程起来了又没了"，没有任何报错。
+
+**两条规避办法**（本仓库的守护脚本请用 **PowerShell 7 / `pwsh`**，安装脚本已经这样注册了任务）：
+
+```powershell
+# 方案 A：用 pwsh（推荐）—— UTF-8 是默认编码
+'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\MouseGuard.ps1
+
+# 方案 B：脚本内容全部用纯 ASCII —— 5.1 和 7 下行为一致
+```
+
+> 判断依据很简单：**只要脚本里有中文，就必须用 `pwsh` 跑**；要兼容 5.1，就把脚本写成纯 ASCII。
+
+### `Start-Process -WindowStyle` 在计划任务里会静默失败
+
+在计划任务上下文里用 `Start-Process ... -WindowStyle Hidden` 拉后台子进程，进程**可能压根不启动**，而且没有报错。
+
+改用 .NET API，并记得把 stderr 重定向出来，否则失败时同样什么都看不到：
+
+```powershell
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName  = 'cmd.exe'
+$psi.Arguments = '/c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\script.ps1" > "C:\path\out.txt" 2>&1'
+$psi.UseShellExecute = $false
+$psi.CreateNoWindow = $true
+[System.Diagnostics.Process]::Start($psi) | Out-Null
+```
+
 ---
 
 ## 目录结构
@@ -221,6 +291,7 @@ WatchBoth: G304=0 其它=0
 │   ├── root-cause.md             ← 根因深度分析（含两次被证伪的结论）
 │   └── diagnostics.md            ← 完整诊断实录
 └── evidence/                     ← 执行日志（已脱敏）
+    └── field-test-20261022.log   ← 整日实测遥测（6 次待机回机全部自动恢复）
 ```
 
 ---
